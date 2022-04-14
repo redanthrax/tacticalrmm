@@ -17,22 +17,22 @@ LINUX_AGENT_SCRIPT = BASE_DIR / "core" / "agent_linux.sh"
 AUTH_USER_MODEL = "accounts.User"
 
 # latest release
-TRMM_VERSION = "0.12.1"
+TRMM_VERSION = "0.12.5-dev"
 
 # bump this version everytime vue code is changed
 # to alert user they need to manually refresh their browser
-APP_VER = "0.0.159"
+APP_VER = "0.0.160"
 
 # https://github.com/amidaware/rmmagent
-LATEST_AGENT_VER = "2.0.1"
+LATEST_AGENT_VER = "2.0.2"
 
-MESH_VER = "0.9.98"
+MESH_VER = "1.0.2"
 
 NATS_SERVER_VER = "2.7.4"
 
 # for the update script, bump when need to recreate venv or npm install
-PIP_VER = "27"
-NPM_VER = "30"
+PIP_VER = "28"
+NPM_VER = "31"
 
 SETUPTOOLS_VER = "59.6.0"
 WHEEL_VER = "0.37.1"
@@ -51,11 +51,27 @@ DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 ASGI_APPLICATION = "tacticalrmm.asgi.application"
 
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "UTC"
+USE_I18N = True
+USE_L10N = True
+USE_TZ = True
+
+STATIC_URL = "/static/"
+
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "tacticalrmm/static/")]
+
 REST_KNOX = {
     "TOKEN_TTL": timedelta(hours=5),
     "AUTO_REFRESH": True,
     "MIN_REFRESH_INTERVAL": 600,
 }
+
+DEMO = False
+DEBUG = False
+ADMIN_ENABLED = False
+REDIS_HOST = "127.0.0.1"
 
 try:
     from .local_settings import *
@@ -63,7 +79,7 @@ except ImportError:
     pass
 
 REST_FRAMEWORK = {
-    "DATETIME_FORMAT": "%b-%d-%Y - %H:%M",
+    # "DATETIME_FORMAT": "%b-%d-%Y - %H:%M",
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "knox.auth.TokenAuthentication",
@@ -79,11 +95,28 @@ SPECTACULAR_SETTINGS = {
     "AUTHENTICATION_WHITELIST": ["tacticalrmm.auth.APIAuthentication"],
 }
 
-if not "AZPIPELINE" in os.environ:
-    if not DEBUG:  # type: ignore
-        REST_FRAMEWORK.update(
-            {"DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",)}
-        )
+
+if not DEBUG:
+    REST_FRAMEWORK.update(
+        {"DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",)}
+    )
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",  ##
+    "tacticalrmm.middleware.LogIPMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "tacticalrmm.middleware.AuditMiddleware",
+    "tacticalrmm.middleware.LinuxMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+if DEMO:
+    MIDDLEWARE += ("tacticalrmm.middleware.DemoMiddleware",)
+
 
 INSTALLED_APPS = [
     "django.contrib.auth",
@@ -112,28 +145,32 @@ INSTALLED_APPS = [
     "drf_spectacular",
 ]
 
-if not "AZPIPELINE" in os.environ:
-    if DEBUG:  # type: ignore
-        INSTALLED_APPS += ("django_extensions",)
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [(REDIS_HOST, 6379)],
+        },
+    },
+}
 
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels_redis.core.RedisChannelLayer",
-            "CONFIG": {
-                "hosts": [(REDIS_HOST, 6379)],  # type: ignore
-            },
+# silence cache key length warnings
+import warnings
+from django.core.cache import CacheKeyWarning
+
+warnings.simplefilter("ignore", CacheKeyWarning)
+
+CACHES = {
+    "default": {
+        "BACKEND": "tacticalrmm.cache.TacticalRedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:6379",
+        "OPTIONS": {
+            "parser_class": "redis.connection.HiredisParser",
+            "pool_class": "redis.BlockingConnectionPool",
+            "db": "10",
         },
     }
-
-if "AZPIPELINE" in os.environ:
-    ADMIN_ENABLED = False
-
-if ADMIN_ENABLED:  # type: ignore
-    INSTALLED_APPS += (
-        "django.contrib.admin",
-        "django.contrib.messages",
-    )
-
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -148,14 +185,24 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-if ADMIN_ENABLED:  # type: ignore
-    MIDDLEWARE += ("django.contrib.messages.middleware.MessageMiddleware",)
+if DEBUG:
+    INSTALLED_APPS += (
+        "django_extensions",
+        "silk",
+    )
 
-try:
-    if DEMO:  # type: ignore
-        MIDDLEWARE += ("tacticalrmm.middleware.DemoMiddleware",)
-except:
-    pass
+    MIDDLEWARE.insert(0, "silk.middleware.SilkyMiddleware")
+
+if ADMIN_ENABLED:
+    MIDDLEWARE += ("django.contrib.messages.middleware.MessageMiddleware",)
+    INSTALLED_APPS += (
+        "django.contrib.admin",
+        "django.contrib.messages",
+    )
+
+if DEMO:
+    MIDDLEWARE += ("tacticalrmm.middleware.DemoMiddleware",)
+
 
 ROOT_URLCONF = "tacticalrmm.urls"
 
@@ -193,23 +240,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
-LANGUAGE_CODE = "en-us"
-
-TIME_ZONE = "UTC"
-
-USE_I18N = True
-
-USE_L10N = True
-
-USE_TZ = True
-
-
-STATIC_URL = "/static/"
-
-STATIC_ROOT = os.path.join(BASE_DIR, "static")
-STATICFILES_DIRS = [os.path.join(BASE_DIR, "tacticalrmm/static/")]
-
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -233,7 +263,10 @@ LOGGING = {
 }
 
 if "AZPIPELINE" in os.environ:
-    print("PIPELINE")
+    ADMIN_ENABLED = False
+
+if "GHACTIONS" in os.environ:
+    print("-----------------------PIPELINE----------------------------")
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -244,25 +277,19 @@ if "AZPIPELINE" in os.environ:
             "PORT": "",
         }
     }
-
-    REST_FRAMEWORK = {
-        "DATETIME_FORMAT": "%b-%d-%Y - %H:%M",
-        "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
-        "DEFAULT_AUTHENTICATION_CLASSES": (
-            "knox.auth.TokenAuthentication",
-            "tacticalrmm.auth.APIAuthentication",
-        ),
-        "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),
-    }
-
-    ALLOWED_HOSTS = ["api.example.com"]
-    DEBUG = True
     SECRET_KEY = "abcdefghijklmnoptravis123456789"
-
+    DEBUG = False
+    ALLOWED_HOSTS = ["api.example.com"]
     ADMIN_URL = "abc123456/"
-
-    SCRIPTS_DIR = os.path.join(Path(BASE_DIR).parents[1], "scripts")
+    CORS_ORIGIN_WHITELIST = ["https://rmm.example.com"]
     MESH_USERNAME = "pipeline"
     MESH_SITE = "https://example.com"
     MESH_TOKEN_KEY = "bd65e957a1e70c622d32523f61508400d6cd0937001a7ac12042227eba0b9ed625233851a316d4f489f02994145f74537a331415d00047dbbf13d940f556806dffe7a8ce1de216dc49edbad0c1a7399c"
     REDIS_HOST = "localhost"
+    ADMIN_ENABLED = False
+
+    CACHES = {
+        "default": {
+            "BACKEND": "tacticalrmm.cache.TacticalDummyCache",
+        }
+    }

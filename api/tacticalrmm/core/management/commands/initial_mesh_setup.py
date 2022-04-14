@@ -2,8 +2,7 @@ import asyncio
 import json
 
 import websockets
-from core.models import CoreSettings
-from core.utils import get_mesh_ws_url
+from core.utils import get_mesh_ws_url, get_core_settings
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
@@ -39,15 +38,15 @@ class Command(BaseCommand):
                         break
 
     def handle(self, *args, **kwargs):
-        mesh_settings = CoreSettings.objects.first()
+        mesh_settings = get_core_settings()
 
         try:
             # Check for Mesh Username
             if (
                 not mesh_settings.mesh_username
-                or settings.MESH_USERNAME != mesh_settings.mesh_username
+                or settings.MESH_USERNAME.lower() != mesh_settings.mesh_username
             ):
-                mesh_settings.mesh_username = settings.MESH_USERNAME
+                mesh_settings.mesh_username = settings.MESH_USERNAME.lower()
 
             # Check for Mesh Site
             if (

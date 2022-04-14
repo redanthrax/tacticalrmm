@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SCRIPT_VERSION="59"
+SCRIPT_VERSION="61"
 SCRIPT_URL='https://raw.githubusercontent.com/amidaware/tacticalrmm/master/install.sh'
 
 sudo apt install -y curl wget dirmngr gnupg lsb-release
@@ -212,7 +212,7 @@ print_green 'Installing redis and git'
 sudo apt install -y ca-certificates redis git
 
 # apply redis configuration
-sudo redis-cli config set appendonly yes
+sudo redis-cli config set appendonly no
 sudo redis-cli config rewrite
 
 print_green 'Installing postgresql'
@@ -406,6 +406,7 @@ buffer-size = 65535
 vacuum = true
 die-on-term = true
 max-requests = 500
+disable-logging = true
 EOF
 )"
 echo "${uwsgini}" > /rmm/api/tacticalrmm/app.ini
@@ -657,7 +658,7 @@ CELERY_APP="tacticalrmm"
 
 CELERYD_MULTI="multi"
 
-CELERYD_OPTS="--time-limit=86400 --autoscale=50,3"
+CELERYD_OPTS="--time-limit=86400 --autoscale=20,2"
 
 CELERYD_PID_FILE="/rmm/api/tacticalrmm/%n.pid"
 CELERYD_LOG_FILE="/var/log/celery/%n%I.log"
