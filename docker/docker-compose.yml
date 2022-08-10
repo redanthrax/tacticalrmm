@@ -62,6 +62,7 @@ services:
       MESH_HOST: ${MESH_HOST}
       TRMM_USER: ${TRMM_USER}
       TRMM_PASS: ${TRMM_PASS}
+      DEV: ${DEV}
     depends_on:
       - tactical-postgres
       - tactical-meshcentral
@@ -144,6 +145,7 @@ services:
     volumes:
       - tactical_data:/opt/tactical
     environment:
+      DEV: ${DEV}
       API_HOST: ${API_HOST}
 
   # container for django backend
@@ -159,6 +161,8 @@ services:
       - redis
     volumes:
       - tactical_data:/opt/tactical
+    environment:
+      DEV: ${DEV}
     depends_on:
       - tactical-postgres
 
@@ -191,6 +195,7 @@ services:
       MESH_HOST: ${MESH_HOST}
       CERT_PUB_KEY: ${CERT_PUB_KEY}
       CERT_PRIV_KEY: ${CERT_PRIV_KEY}
+      DEV: ${DEV}
     networks:
       proxy:
         ipv4_address: 172.20.0.20

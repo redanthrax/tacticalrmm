@@ -20,6 +20,7 @@ set -e
 
 : "${CERT_PRIV_PATH:=${TACTICAL_DIR}/certs/privkey.pem}"
 : "${CERT_PUB_PATH:=${TACTICAL_DIR}/certs/fullchain.pem}"
+: "${DEV:=0}"
 
 function check_tactical_ready {
   sleep 15
@@ -65,11 +66,25 @@ if [ "$1" = 'tactical-init' ]; then
   MESH_TOKEN=$(cat ${TACTICAL_DIR}/tmp/mesh_token)
   ADMINURL=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 70 | head -n 1)
   DJANGO_SEKRET=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 80 | head -n 1)
-  
+
+  DEBUG=False
+  CORS="
+CORS_ORIGIN_WHITELIST = [
+	'https://${APP_HOST}'
+]
+"
+
+  if [[ $DEV -eq 1 ]]; then
+	DEBUG=True
+	CORS="
+CORS_ORIGIN_ALLOW_ALL = True
+"
+  fi
+
   localvars="$(cat << EOF
 SECRET_KEY = '${DJANGO_SEKRET}'
 
-DEBUG = False
+DEBUG = ${DEBUG}
 
 DOCKER_BUILD = True
 
@@ -85,9 +100,7 @@ ALLOWED_HOSTS = ['${API_HOST}', 'tactical-backend']
 
 ADMIN_URL = '${ADMINURL}/'
 
-CORS_ORIGIN_WHITELIST = [
-    'https://${APP_HOST}'
-]
+${CORS}
 
 DATABASES = {
     'default': {
@@ -105,7 +118,7 @@ MESH_SITE = 'https://${MESH_HOST}'
 MESH_TOKEN_KEY = '${MESH_TOKEN}'
 REDIS_HOST    = '${REDIS_HOST}'
 MESH_WS_URL = '${MESH_WS_URL}'
-ADMIN_ENABLED = False
+ADMIN_ENABLED = ${DEBUG}
 EOF
 )"
 
@@ -172,8 +185,13 @@ fi
 # backend container
 if [ "$1" = 'tactical-backend' ]; then
   check_tactical_ready
-
-  uwsgi ${TACTICAL_DIR}/api/uwsgi.ini
+	
+  if [[ $DEV -eq 1 ]]; then
+	  #pip install -r requirements-dev.txt -r requirements-test.txt
+	  python manage.py runserver 0:8080
+  else
+	uwsgi ${TACTICAL_DIR}/api/uwsgi.ini
+  fi
 fi
 
 if [ "$1" = 'tactical-celery' ]; then
