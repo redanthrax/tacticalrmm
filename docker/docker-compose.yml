@@ -49,6 +49,11 @@ services:
 
   # used to initialize the docker environment
   tactical-init:
+    build:
+      context: ../
+      dockerfile: docker/containers/tactical/dockerfile
+      args:
+        - DEV=${DEV}
     container_name: trmm-init
     image: ${IMAGE_REPO}tactical:${VERSION}
     restart: on-failure
@@ -79,6 +84,9 @@ services:
 
   # nats
   tactical-nats:
+    build:
+      context: ../
+      dockerfile: docker/containers/tactical-nats/dockerfile
     container_name: trmm-nats
     image: ${IMAGE_REPO}tactical-nats:${VERSION}
     user: 1000:1000
@@ -98,6 +106,9 @@ services:
 
   # meshcentral container
   tactical-meshcentral:
+    build:
+      context: ../
+      dockerfile: docker/containers/tactical-meshcentral/dockerfile
     container_name: trmm-meshcentral
     image: ${IMAGE_REPO}tactical-meshcentral:${VERSION}
     user: 1000:1000
@@ -137,6 +148,9 @@ services:
 
   # container that hosts vue frontend
   tactical-frontend:
+    build:
+      context: ../
+      dockerfile: docker/containers/tactical-frontend/dockerfile
     container_name: trmm-frontend
     image: ${IMAGE_REPO}tactical-frontend:${VERSION}
     user: 1000:1000
@@ -186,6 +200,9 @@ services:
 
   # container for tactical reverse proxy
   tactical-nginx:
+    build:
+      context: ../
+      dockerfile: docker/containers/tactical-nginx/dockerfile
     container_name: trmm-nginx
     image: ${IMAGE_REPO}tactical-nginx:${VERSION}
     user: 1000:1000
