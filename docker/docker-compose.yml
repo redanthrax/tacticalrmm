@@ -85,6 +85,7 @@ services:
     restart: always
     environment:
       API_HOST: ${API_HOST}
+      DEV: ${DEV}
     ports:
       - "4222:4222"
     volumes:

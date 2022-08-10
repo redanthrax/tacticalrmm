@@ -187,8 +187,7 @@ if [ "$1" = 'tactical-backend' ]; then
   check_tactical_ready
 	
   if [[ $DEV -eq 1 ]]; then
-	  #pip install -r requirements-dev.txt -r requirements-test.txt
-	  python manage.py runserver 0:8080
+	python manage.py runserver 0:8080
   else
 	uwsgi ${TACTICAL_DIR}/api/uwsgi.ini
   fi
