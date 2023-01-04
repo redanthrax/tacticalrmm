@@ -1,0 +1,5 @@
+FROM node:18-alpine
+WORKDIR /app
+RUN npm i -g @quasar/cli
+RUN npm i create-quasar
+EXPOSE 9000

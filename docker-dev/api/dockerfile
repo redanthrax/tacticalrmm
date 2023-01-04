@@ -1,0 +1,19 @@
+FROM python:3.10.8-slim
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+ENV PYTHONUNBUFFERED 1
+ENV VIRTUAL_ENV /venv
+RUN python3 -m venv $VIRTUAL_ENV
+ENV PATH "${VIRTUAL_ENV}/bin:$PATH"
+
+WORKDIR /opt
+
+COPY requirements.txt /tmp
+COPY requirements-dev.txt /tmp
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc libc6-dev && \
+    python3 -m pip install --upgrade pip && \
+    pip install --no-cache-dir setuptools wheel && \
+    pip install --no-cache-dir -r /tmp/requirements.txt && \
+    pip install --no-cache-dir -r /tmp/requirements-dev.txt

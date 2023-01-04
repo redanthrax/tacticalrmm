@@ -1,0 +1,82 @@
+version: '3'
+
+volumes:
+  redis: null
+  db: null
+
+services:
+  postgres:
+    image: postgres:13-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: tacticalrmm
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+    volumes: 
+      - db:/var/lib/postgresql/data
+  redis:
+    image: redis:6.0-alpine
+    ports:
+      - "6379:6379"
+    user: 1000:1000
+    restart: always
+    volumes:
+      - redis:/data
+    command: redis-server
+  frontend:
+    build: './frontend'
+    ports:
+      - "9000:9000"
+    volumes:
+      - ../../tacticalrmm-web:/app
+    command: /bin/sh -c "yarn && quasar dev"
+  mesh:
+    build: './mesh'
+    ports:
+      - "8000:8080"
+      - "4443:443"
+    command: node node_modules/meshcentral
+  nats:
+    build: './nats'
+    volumes:
+      - ./nats/configwatcher.sh:/usr/local/bin/config_watcher.sh
+      - ./nats/natsrmm.conf:/natsrmm.conf
+      - ./nats/natsapi.conf:/natsapi.conf
+      - ./nats/supervisor.conf:/etc/supervisor/conf.d/supervisor.conf
+      - ./nats/key.pem:/key.pem
+      - ./nats/cert.pem:/cert.pem
+    ports:
+      - "4222:4222"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        chmod +x /usr/local/bin/config_watcher.sh
+        /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisor.conf
+  api:
+    build: './api'
+    depends_on:
+      - "redis"
+      - "postgres"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../api/tacticalrmm:/opt
+      - ./api/settings.py:/local_settings.py
+    command: 
+      - /bin/sh
+      - -c
+      - |
+        cp -f /local_settings.py /opt/tacticalrmm/local_settings.py
+        python manage.py pre_update_tasks
+        python manage.py migrate --no-input
+        python manage.py collectstatic --no-input
+        python manage.py initial_db_setup
+        python manage.py initial_mesh_setup
+        python manage.py load_chocos
+        python manage.py load_community_scripts
+        python manage.py create_uwsgi_conf
+        python manage.py create_installer_user
+        python manage.py post_update_tasks
+        echo "from accounts.models import User; User.objects.create_superuser('dev', 'dev@dev.local', 'dev') if not User.objects.filter(username='dev').exists() else 0;" | python manage.py shell
+        python manage.py runserver 0.0.0.0:8080
