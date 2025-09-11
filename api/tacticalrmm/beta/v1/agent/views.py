@@ -4,6 +4,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.request import Request
 from rest_framework.serializers import BaseSerializer
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from agents.models import Agent
 from agents.permissions import AgentPerms
@@ -12,6 +13,28 @@ from beta.v1.pagination import StandardResultsSetPagination
 from ..serializers import DetailAgentSerializer, ListAgentSerializer
 
 
+@extend_schema_view(
+    list=extend_schema(
+        tags=["Beta API v1 - Agents"],
+        description="List all agents with filtering and pagination",
+        summary="List Agents"
+    ),
+    retrieve=extend_schema(
+        tags=["Beta API v1 - Agents"],
+        description="Retrieve a specific agent by ID",
+        summary="Get Agent"
+    ),
+    update=extend_schema(
+        tags=["Beta API v1 - Agents"],
+        description="Update a specific agent",
+        summary="Update Agent"
+    ),
+    partial_update=extend_schema(
+        tags=["Beta API v1 - Agents"],
+        description="Partially update a specific agent",
+        summary="Patch Agent"
+    ),
+)
 class AgentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, AgentPerms]
     queryset = Agent.objects.all()

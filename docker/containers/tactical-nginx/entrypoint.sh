@@ -146,10 +146,59 @@ server  {
     
 }
 
+# HTTP to HTTPS redirect for API - only in production
 server {
     listen 8080;
     server_name ${API_HOST};
-    return 301 https://\$server_name\$request_uri;
+    
+    location / {
+        ${API_NGINX}
+    }
+
+    ${STATIC_ASSETS}
+
+    location /private/ {
+        internal;
+        add_header "Access-Control-Allow-Origin" "http://${APP_HOST}";
+        alias ${TACTICAL_DIR}/api/tacticalrmm/private/;
+    }
+
+    location ~ ^/ws/ {
+        set \$api http://${WEBSOCKETS_SERVICE}:8383;
+        proxy_pass \$api;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_redirect     off;
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_set_header   X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Host \$server_name;
+    }
+
+    location /assets/ {
+        internal;
+        add_header "Access-Control-Allow-Origin" "http://${APP_HOST}";
+        alias /opt/tactical/reporting/assets/;
+    }
+
+    location ~ ^/natsws {
+        set \$natswebsocket http://${NATS_SERVICE}:9235;
+        proxy_pass \$natswebsocket;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host \$host;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header X-Forwarded-Host \$host:\$server_port;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    client_max_body_size 300M;
+    
 }
 
 # frontend config
@@ -188,11 +237,28 @@ server  {
     
 }
 
+# HTTP server for frontend in development
 server {
-
     listen 8080;
     server_name ${APP_HOST};
-    return 301 https://\$server_name\$request_uri;
+    
+    location / {
+        #Using variable to disable start checks
+        set \$app http://${FRONTEND_SERVICE}:${APP_PORT};
+
+        proxy_pass \$app;
+        proxy_http_version  1.1;
+        proxy_cache_bypass  \$http_upgrade;
+        
+        proxy_set_header Upgrade           \$http_upgrade;
+        proxy_set_header Connection        "upgrade";
+        proxy_set_header Host              \$host;
+        proxy_set_header X-Real-IP         \$remote_addr;
+        proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host  \$host;
+        proxy_set_header X-Forwarded-Port  \$server_port;
+    }
 }
 
 # meshcentral config

@@ -71,39 +71,39 @@ function django_setup {
   wait_for_service "${POSTGRES_HOST}" "${POSTGRES_PORT}" "PostgreSQL" &
   postgres_pid=$!
   
-  # Skip MeshCentral wait for development
-  # wait_for_service "${MESH_SERVICE}" "4443" "MeshCentral" &
-  # mesh_pid=$!
+  wait_for_service "${MESH_SERVICE}" "4443" "MeshCentral" &
+  mesh_pid=$!
   
-  # Wait for postgres service
+  # Wait for both services
   if ! wait $postgres_pid; then
     echo "ERROR: PostgreSQL connection failed"
     exit 1
   fi
   
-  echo "Skipping MeshCentral wait for development setup"
+  if ! wait $mesh_pid; then
+    echo "ERROR: MeshCentral connection failed"
+    exit 1
+  fi
 
   echo "All services are ready, setting up Django environment..."
 
-  # Check if mesh token exists, create dummy if not (for development)
+  # Check if mesh token exists before reading
   local mesh_token_file="${TACTICAL_DIR}/tmp/mesh_token"
   if [ ! -f "$mesh_token_file" ]; then
-    echo "Creating dummy mesh token for development"
-    mkdir -p "${TACTICAL_DIR}/tmp"
-    echo "dummy_mesh_token_for_development" > "$mesh_token_file"
+    echo "ERROR: Mesh token file not found: $mesh_token_file"
+    exit 1
   fi
   
   MESH_TOKEN="$(cat "$mesh_token_file")"
   
   if [ -z "$MESH_TOKEN" ]; then
-    echo "WARNING: Mesh token is empty, using dummy"
-    MESH_TOKEN="dummy_mesh_token_for_development"
+    echo "ERROR: Mesh token is empty"
+    exit 1
   fi
 
   DJANGO_SEKRET=$(openssl rand -base64 60 | tr -d '\n')
 
-  # For localhost development, use localhost as base domain
-  BASE_DOMAIN="localhost"
+  BASE_DOMAIN=$(echo "import tldextract; no_fetch_extract = tldextract.TLDExtract(suffix_list_urls=()); extracted = no_fetch_extract('${API_HOST}'); print(f'{extracted.domain}.{extracted.suffix}')" | python)
 
   # Create local settings with optimized configuration
   localvars="$(
@@ -125,13 +125,13 @@ ADMIN_URL = 'admin/'
 
 ALLOWED_HOSTS = ['${API_HOST}', '${APP_HOST}', '*']
 
-CORS_ORIGIN_WHITELIST = ['${HTTP_PROTOCOL}://${APP_HOST}']
+CORS_ORIGIN_WHITELIST = ['https://${APP_HOST}']
 
 SESSION_COOKIE_DOMAIN = '${BASE_DOMAIN}'
 CSRF_COOKIE_DOMAIN = '${BASE_DOMAIN}'
-CSRF_TRUSTED_ORIGINS = ['${HTTP_PROTOCOL}://${API_HOST}', '${HTTP_PROTOCOL}://${APP_HOST}']
+CSRF_TRUSTED_ORIGINS = ['https://${API_HOST}', 'https://${APP_HOST}']
 
-HEADLESS_FRONTEND_URLS = {'socialaccount_login_error': '${HTTP_PROTOCOL}://${APP_HOST}/account/provider/callback'}
+HEADLESS_FRONTEND_URLS = {'socialaccount_login_error': 'https://${APP_HOST}/account/provider/callback'}
 
 # Database configuration with optimized settings
 DATABASES = {
@@ -162,20 +162,13 @@ DATABASES = {
 }
 
 MESH_USERNAME = '${MESH_USER}'
-MESH_SITE = '${HTTP_PROTOCOL}://${MESH_HOST}'
+MESH_SITE = 'https://${MESH_HOST}'
 MESH_TOKEN_KEY = '${MESH_TOKEN}'
 REDIS_HOST = '${REDIS_HOST}'
 MESH_WS_URL = '${MESH_WS_URL}'
 ADMIN_ENABLED = True
 TRMM_INSECURE = True
-BETA_API_ENABLED = True
-
-# Development settings for localhost
-SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
-SECURE_BROWSER_XSS_FILTER = False
-SECURE_CONTENT_TYPE_NOSNIFF = False
+BETA_API_ENABLED = False
 
 # Cache optimization
 CACHES = {

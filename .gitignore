@@ -60,3 +60,40 @@ setup_dev.yml
 query_schema.json
 gunicorn_config.py
 set_local_config.py
+
+# Development containers and volumes
+.dev-volumes/
+*.dockerignore.optimized
+
+# IDE and editor files
+*.swp
+*.swo
+*~
+.viminfo
+*.orig
+.editorconfig
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Development and build artifacts
+*.egg-info/
+build/
+dist/
+.eggs/
+*.wheel
+*.whl

@@ -24,9 +24,20 @@ if TYPE_CHECKING:
 
 
 def get_certs() -> tuple[str, str]:
-    domain = settings.ALLOWED_HOSTS[0].split(".", 1)[1]
-    cert_file = f"/etc/letsencrypt/live/{domain}/fullchain.pem"
-    key_file = f"/etc/letsencrypt/live/{domain}/privkey.pem"
+    host = settings.ALLOWED_HOSTS[0]
+    # Handle localhost development environment
+    if host.startswith("localhost") or host.startswith("127.0.0.1"):
+        # Use dummy cert paths for development
+        cert_file = "/opt/tactical/certs/fullchain.pem"
+        key_file = "/opt/tactical/certs/privkey.pem"
+    else:
+        domain_parts = host.split(".", 1)
+        if len(domain_parts) > 1:
+            domain = domain_parts[1]
+        else:
+            domain = host
+        cert_file = f"/etc/letsencrypt/live/{domain}/fullchain.pem"
+        key_file = f"/etc/letsencrypt/live/{domain}/privkey.pem"
 
     if hasattr(settings, "CERT_FILE") and hasattr(settings, "KEY_FILE"):
         cert_file = settings.CERT_FILE

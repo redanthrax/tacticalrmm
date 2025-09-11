@@ -1,0 +1,339 @@
+services:
+  # postgres database for api service
+  postgres-dev:
+    container_name: trmm-postgres-dev
+    image: postgres:15-alpine  # Updated to newer version
+    restart: always
+    shm_size: 256mb  # Improved shared memory
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - postgres-data-dev:/var/lib/postgresql/data
+    networks:
+      dev:
+        aliases:
+          - tactical-postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: >
+      postgres 
+      -c shared_buffers=256MB
+      -c max_connections=100
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.7
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+
+  # redis container for celery tasks
+  redis-dev:
+    container_name: trmm-redis-dev
+    restart: always
+    image: redis:7.0-alpine  # Updated to newer version
+    command: >
+      redis-server 
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+    volumes:
+      - redis-data-dev:/var/lib/redis
+    networks:
+      dev:
+        aliases:
+          - tactical-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  # mongodb container for meshcentral
+  mongodb-dev:
+    container_name: trmm-mongodb-dev
+    image: mongo:6.0  # Updated to newer version
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+      MONGO_INITDB_DATABASE: meshcentral
+    networks:
+      dev:
+        aliases:
+          - tactical-mongodb
+    volumes:
+      - mongo-dev-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: >
+      mongod 
+      --bind_ip_all
+      --wiredTigerCacheSizeGB 0.5
+
+  # meshcentral container
+  meshcentral-dev:
+    container_name: trmm-meshcentral-dev
+    image: tactical-meshcentral-arm64:latest
+    restart: always
+    user: 1000:1000
+    environment:
+      MESH_HOST: ${MESH_HOST}
+      MESH_USER: ${MESH_USER}
+      MESH_PASS: ${MESH_PASS}
+      MONGODB_USER: ${MONGODB_USER}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD}
+      NGINX_HOST_IP: ${DOCKER_NGINX_IP}
+    networks:
+      dev:
+        aliases:
+          - tactical-meshcentral
+          - ${MESH_HOST}
+    volumes:
+      - tactical-data-dev:/opt/tactical
+      - mesh-data-dev:/home/node/app/meshcentral-data
+    depends_on:
+      mongodb-dev:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "netstat -lnt | grep :4443 || ss -lnt | grep :4443"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+
+  api-dev:
+    container_name: trmm-api-dev
+    image: api-dev
+    restart: always
+    user: 1000:1000
+    build:
+      context: ..
+      dockerfile: .devcontainer/api.dockerfile.optimized
+      cache_from:
+        - api-dev:latest
+      target: ""
+    command: ["tactical-api"]
+    environment:
+      API_PORT: ${API_PORT}
+    ports:
+      - "8000:8000"
+    volumes:
+      - tactical-data-dev:/opt/tactical
+      - ..:/workspace:cached
+    networks:
+      dev:
+        aliases:
+          - tactical-backend
+    depends_on:
+      postgres-dev:
+        condition: service_healthy
+      redis-dev:
+        condition: service_healthy
+      init-dev:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${API_PORT}/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # nats
+  nats-dev:
+    container_name: trmm-nats-dev
+    image: tactical-nats-arm64:latest
+    restart: always
+    user: 1000:1000
+    environment:
+      API_HOST: ${API_HOST}
+      API_PORT: ${API_PORT}
+      DEV: 1
+    ports:
+      - "${NATS_PORTS}"
+    volumes:
+      - tactical-data-dev:/opt/tactical
+      - ..:/workspace:cached
+    networks:
+      dev:
+        aliases:
+          - ${API_HOST}
+          - tactical-nats
+    depends_on:
+      api-dev:
+        condition: service_healthy
+
+  init-dev:
+    container_name: trmm-init-dev
+    image: api-dev
+    restart: "no"  # Only run once
+    command: ["tactical-init-dev"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASS: ${POSTGRES_PASS}
+      APP_HOST: ${APP_HOST}
+      API_HOST: ${API_HOST}
+      MESH_HOST: ${MESH_HOST}
+      MESH_USER: ${MESH_USER}
+      TRMM_USER: ${TRMM_USER}
+      TRMM_PASS: ${TRMM_PASS}
+      HTTP_PROTOCOL: ${HTTP_PROTOCOL}
+      APP_PORT: ${APP_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+    depends_on:
+      - postgres-dev
+      - meshcentral-dev
+      - redis-dev
+    networks:
+      - dev
+    volumes:
+      - tactical-data-dev:/opt/tactical
+      - mesh-data-dev:/meshcentral-data
+      - redis-data-dev:/var/lib/redis
+      - mongo-dev-data:/mongo/data/db
+      - ..:/workspace:cached
+
+  # container for celery worker service
+  celery-dev:
+    container_name: trmm-celery-dev
+    image: api-dev
+    command: ["tactical-celery-dev"]
+    restart: always
+    user: 1000:1000
+    networks:
+      - dev
+    volumes:
+      - tactical-data-dev:/opt/tactical
+      - ..:/workspace:cached
+    depends_on:
+      api-dev:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+        reservations:
+          memory: 256m
+
+  # container for celery beat service
+  celerybeat-dev:
+    container_name: trmm-celerybeat-dev
+    image: api-dev
+    command: ["tactical-celerybeat-dev"]
+    restart: always
+    user: 1000:1000
+    networks:
+      - dev
+    volumes:
+      - tactical-data-dev:/opt/tactical
+      - ..:/workspace:cached
+    depends_on:
+      api-dev:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+        reservations:
+          memory: 128m
+
+  # container for websockets communication
+  websockets-dev:
+    container_name: trmm-websockets-dev
+    image: api-dev
+    command: ["tactical-websockets-dev"]
+    restart: always
+    user: 1000:1000
+    networks:
+      dev:
+        aliases:
+          - tactical-websockets
+    volumes:
+      - tactical-data-dev:/opt/tactical
+      - ..:/workspace:cached
+    depends_on:
+      api-dev:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8383/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # container for tactical reverse proxy
+  nginx-dev:
+    container_name: trmm-nginx-dev
+    image: tactical-nginx-arm64:latest
+    restart: always
+    user: 1000:1000
+    environment:
+      APP_HOST: ${APP_HOST}
+      API_HOST: ${API_HOST}
+      MESH_HOST: ${MESH_HOST}
+      CERT_PUB_KEY: ${CERT_PUB_KEY}
+      CERT_PRIV_KEY: ${CERT_PRIV_KEY}
+      APP_PORT: ${APP_PORT}
+      API_PORT: ${API_PORT}
+      DEV: 1
+    networks:
+      dev:
+        ipv4_address: ${DOCKER_NGINX_IP}
+    ports:
+      - "80:8080"
+      - "443:4443"
+    volumes:
+      - tactical-data-dev:/opt/tactical
+      - ..:/workspace:cached
+
+volumes:
+  tactical-data-dev: 
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/.dev-volumes/tactical-data
+  postgres-data-dev: 
+    driver: local
+    driver_opts:
+      type: none  
+      o: bind
+      device: ${PWD}/.dev-volumes/postgres-data
+  mongo-dev-data: 
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/.dev-volumes/mongo-data
+  mesh-data-dev: 
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/.dev-volumes/mesh-data
+  redis-data-dev: 
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/.dev-volumes/redis-data
+
+networks:
+  dev:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: ${DOCKER_NETWORK}
+    driver_opts:
+      com.docker.network.driver.mtu: 1500

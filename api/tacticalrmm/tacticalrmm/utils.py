@@ -210,7 +210,6 @@ def reload_nats() -> None:
                 message=f"{agent.hostname} does not have a user account, NATS will not work",
             )
 
-    cert_file, key_file = get_certs()
     nats_std_host, nats_ws_host, _ = get_nats_hosts()
     nats_std_port, nats_ws_port = get_nats_ports()
 
@@ -227,6 +226,7 @@ def reload_nats() -> None:
     }
 
     if get_nats_internal_protocol() == "tls":
+        cert_file, key_file = get_certs()
         config["tls"] = {
             "cert_file": cert_file,
             "key_file": key_file,

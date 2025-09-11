@@ -57,5 +57,7 @@ if [ -f "$URL_PATH" ]; then
 fi  
 
 # Add runtime base url assignment 
-echo "window._env_ = {PROD_URL: \"https://${API_HOST}\"}" > ${PUBLIC_DIR}/env-config.js
+# Use HTTP_PROTOCOL environment variable if set, default to https
+PROTOCOL=${HTTP_PROTOCOL:-https}
+echo "window._env_ = {PROD_URL: \"${PROTOCOL}://${API_HOST}\"}" > ${PUBLIC_DIR}/env-config.js
 chown -R nginx:nginx /etc/nginx && chown -R nginx:nginx ${PUBLIC_DIR}

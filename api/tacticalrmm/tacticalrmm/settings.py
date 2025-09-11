@@ -114,12 +114,13 @@ DEMO = False
 DEBUG = False
 ADMIN_ENABLED = False
 HOSTED = False
-SWAGGER_ENABLED = False
+SWAGGER_ENABLED = True
 REDIS_HOST = "127.0.0.1"
 TRMM_LOG_LEVEL = "ERROR"
 TRMM_LOG_TO = "file"
 TRMM_PROTO = "https"
 TRMM_BACKEND_PORT = None
+BETA_API_ENABLED = True
 
 if not DOCKER_BUILD:
     ALLOWED_HOSTS = []
@@ -195,6 +196,10 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Simple and Fast remote monitoring and management tool",
     "VERSION": TRMM_VERSION,
     "AUTHENTICATION_WHITELIST": ["tacticalrmm.auth.APIAuthentication"],
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": "/api/v[0-9]",
+    "SCHEMA_PATH_PREFIX_TRIM": True,
 }
 
 
@@ -282,6 +287,9 @@ MIDDLEWARE = [
 
 if SWAGGER_ENABLED:
     INSTALLED_APPS += ("drf_spectacular",)
+
+if BETA_API_ENABLED:
+    INSTALLED_APPS += ("beta.v1",)
 
 if DEBUG and not DEMO:
     INSTALLED_APPS.insert(0, "daphne")

@@ -2,6 +2,10 @@ from rest_framework import serializers
 
 from agents.models import Agent
 from clients.models import Client, Site
+from alerts.models import Alert
+from checks.models import Check
+from autotasks.models import AutomatedTask
+from software.models import InstalledSoftware
 
 
 class ListAgentSerializer(serializers.ModelSerializer[Agent]):
@@ -72,4 +76,28 @@ class ClientSerializer(serializers.ModelSerializer[Client]):
 class SiteSerializer(serializers.ModelSerializer[Site]):
     class Meta:
         model = Site
+        fields = "__all__"
+
+
+class AlertSerializer(serializers.ModelSerializer[Alert]):
+    class Meta:
+        model = Alert
+        fields = "__all__"
+
+
+class CheckSerializer(serializers.ModelSerializer[Check]):
+    class Meta:
+        model = Check
+        fields = "__all__"
+
+
+class TaskSerializer(serializers.ModelSerializer[AutomatedTask]):
+    class Meta:
+        model = AutomatedTask
+        fields = "__all__"
+
+
+class SoftwareSerializer(serializers.ModelSerializer[InstalledSoftware]):
+    class Meta:
+        model = InstalledSoftware
         fields = "__all__"

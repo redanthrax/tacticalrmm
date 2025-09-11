@@ -1,0 +1,99 @@
+# Version control
+.git
+.github
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.venv
+venv/
+.env
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+staticfiles/
+media/
+
+# IDEs and editors
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+node_modules/
+
+# Documentation
+docs/
+*.md
+LICENSE*
+
+# Test files
+.pytest_cache/
+htmlcov/
+.mypy_cache/
+.tox/
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Logs
+*.log
+logs/
+
+# Backup files
+*.bak
+*.backup
+
+# Development tools
+.devcontainer
+docker/
+ansible/
+
+# Scripts and tools not needed in container
+backup.sh
+install.sh
+restore.sh
+troubleshoot_server.sh
+update.sh
+
+# Security
+.env
+.env.*
+secrets/
+private_key*
+*.pem
+*.key
